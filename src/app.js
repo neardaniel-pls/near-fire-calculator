@@ -1,3 +1,4 @@
+const unused = 1;
 import {
   dadosApp,
   estadoEdicao,
