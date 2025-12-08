@@ -1,5 +1,5 @@
 import {
-  dadosApp,
+    dadosApp,
   estadoEdicao,
   salvarDadosNoLocalStorage,
   carregarDadosDoLocalStorage
