@@ -193,6 +193,22 @@ async function calcularResultadosMonteCarlo() {
     document.getElementById('mcP90').textContent = `€${Math.round(resultadosMC.p90).toLocaleString()}`;
     document.getElementById('mcTaxaSucesso').textContent = `${resultadosMC.taxaDeSucesso.toFixed(1)}%`;
 
+    // Display new probabilistic retirement ages
+    document.getElementById('mcIdadeOtimista').textContent =
+      typeof resultadosMC.idadesFIRE.otimista === 'number'
+        ? `${resultadosMC.idadesFIRE.otimista} anos`
+        : resultadosMC.idadesFIRE.otimista;
+    
+    document.getElementById('mcIdadeMediana').textContent =
+      typeof resultadosMC.idadesFIRE.mediana === 'number'
+        ? `${resultadosMC.idadesFIRE.mediana} anos`
+        : resultadosMC.idadesFIRE.mediana;
+    
+    document.getElementById('mcIdadePessimista').textContent =
+      typeof resultadosMC.idadesFIRE.pessimista === 'number'
+        ? `${resultadosMC.idadesFIRE.pessimista} anos`
+        : resultadosMC.idadesFIRE.pessimista;
+
     const resultadosSection = document.getElementById('resultadosMonteCarlo');
     resultadosSection.classList.remove('hidden');
 
