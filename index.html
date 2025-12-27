@@ -17,7 +17,12 @@
         <div class="container">
             <h1 data-i18n-key="fireCalculator">Calculadora FIRE</h1>
             <p data-i18n-key="financialIndependence">Independência Financeira, Aposentadoria Antecipada</p>
-            <div class="language-switcher">
+            <div class="header-controls">
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark/light mode">
+                    <span class="theme-icon sun">☀️</span>
+                    <span class="theme-icon moon hidden">🌙</span>
+                </button>
+                <div class="language-switcher">
                 <button id="lang-selector" class="lang-selector">
                     <span id="current-lang-flag">🇵🇹</span> <span id="current-lang-text">PT</span>
                 </button>
@@ -25,6 +30,7 @@
                     <a href="#" class="lang-option" data-lang="pt">🇵🇹 Português</a>
                     <a href="#" class="lang-option" data-lang="en">🇬🇧 English</a>
                 </div>
+            </div>
             </div>
         </div>
     </header>
