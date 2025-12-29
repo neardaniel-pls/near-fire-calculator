@@ -1,5 +1,5 @@
 import {
-  dadosApp,
+    dadosApp,
   estadoEdicao,
   salvarDadosNoLocalStorage,
   carregarDadosDoLocalStorage
@@ -192,6 +192,22 @@ async function calcularResultadosMonteCarlo() {
     document.getElementById('mcP50').textContent = `€${Math.round(resultadosMC.p50).toLocaleString()}`;
     document.getElementById('mcP90').textContent = `€${Math.round(resultadosMC.p90).toLocaleString()}`;
     document.getElementById('mcTaxaSucesso').textContent = `${resultadosMC.taxaDeSucesso.toFixed(1)}%`;
+
+    // Display new probabilistic retirement ages
+    document.getElementById('mcIdadeOtimista').textContent =
+      typeof resultadosMC.idadesFIRE.otimista === 'number'
+        ? `${resultadosMC.idadesFIRE.otimista} anos`
+        : resultadosMC.idadesFIRE.otimista;
+    
+    document.getElementById('mcIdadeMediana').textContent =
+      typeof resultadosMC.idadesFIRE.mediana === 'number'
+        ? `${resultadosMC.idadesFIRE.mediana} anos`
+        : resultadosMC.idadesFIRE.mediana;
+    
+    document.getElementById('mcIdadePessimista').textContent =
+      typeof resultadosMC.idadesFIRE.pessimista === 'number'
+        ? `${resultadosMC.idadesFIRE.pessimista} anos`
+        : resultadosMC.idadesFIRE.pessimista;
 
     const resultadosSection = document.getElementById('resultadosMonteCarlo');
     resultadosSection.classList.remove('hidden');
@@ -416,7 +432,11 @@ function configurarEventListeners() {
   });
   document.getElementById('btnCalcular').addEventListener('click', calcularResultados);
   document.getElementById('btnCalcularMonteCarlo').addEventListener('click', calcularResultadosMonteCarlo);
-  document.getElementById('btnDownloadPDF').addEventListener('click', gerarPDF);
+  document.getElementById('btnDownloadPDF').addEventListener('click', (e) => {
+    console.log('PDF download button clicked');
+    console.log('gerarPDF function:', typeof gerarPDF);
+    gerarPDF();
+  });
   document.getElementById('btnExportarDados').addEventListener('click', exportarDados);
   document.getElementById('btnImportarDados').addEventListener('click', importarDados);
   document.getElementById('btnSalvarTemplate').addEventListener('click', salvarTemplatePersonalizado);
@@ -471,6 +491,38 @@ function configurarEventListeners() {
   document.getElementById('btnSimularSRR').addEventListener('click', calcularSRR);
 }
 
+// --- Theme Toggle ---
+function setupThemeToggle() {
+  const themeToggle = document.getElementById('theme-toggle');
+  const sunIcon = themeToggle.querySelector('.sun');
+  const moonIcon = themeToggle.querySelector('.moon');
+  
+  // Check for saved theme preference or system preference
+  const savedTheme = localStorage.getItem('color-scheme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  let currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+  applyTheme(currentTheme);
+  
+  themeToggle.addEventListener('click', () => {
+    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+    applyTheme(currentTheme);
+    localStorage.setItem('color-scheme', currentTheme);
+  });
+  
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-color-scheme', theme);
+    
+    if (theme === 'dark') {
+      sunIcon.classList.remove('hidden');
+      moonIcon.classList.add('hidden');
+    } else {
+      sunIcon.classList.add('hidden');
+      moonIcon.classList.remove('hidden');
+    }
+  }
+}
+
 // --- Language Switcher ---
 function setupLanguageSwitcher() {
   const langSelector = document.getElementById('lang-selector');
@@ -501,6 +553,7 @@ function setupLanguageSwitcher() {
 async function inicializarApp() {
   showLoader();
   try {
+    setupThemeToggle();
     setupLanguageSwitcher();
     await setLanguage('pt'); // Set default language
     carregarDadosDoLocalStorage();

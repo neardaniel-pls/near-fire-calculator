@@ -20,7 +20,7 @@ Esta calculadora nasceu dessa necessidade. É uma ferramenta para a comunidade, 
 
 1.  **Clona o repositório:**
     ```bash
-    git clone https://github.com/NearDaniel/calculadora-fire.git
+    git clone https://github.com/neardaniel-pls/calculadora-fire.git
     cd calculadora-fire
     ```
 2.  **Abre o `index.html` no teu browser.** A forma mais fácil é usar a extensão **Live Server** no Visual Studio Code.

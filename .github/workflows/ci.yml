@@ -22,15 +22,5 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run ESLint to auto-fix issues
-        run: npm run lint -- --fix
-
-      - name: Commit and push changes
-        if: github.event_name == 'pull_request'
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "style: apply automatic linting fixes"
-          branch: ${{ github.head_ref }}
-
-      - name: Run ESLint again to check for remaining errors
+      - name: Run ESLint
         run: npm run lint
