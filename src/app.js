@@ -1,5 +1,5 @@
 import {
-    dadosApp,
+  dadosApp,
   estadoEdicao,
   salvarDadosNoLocalStorage,
   carregarDadosDoLocalStorage
@@ -7,95 +7,74 @@ import {
 
 import {
   popularDadosIniciais,
-  mostrarFormDeposito,
-  esconderFormDeposito,
-  preencherFormularioDeposito,
-  getDadosFormularioDeposito,
-  atualizarTabelaDepositos,
-  mostrarFormEventoUnico,
-  esconderFormEventoUnico,
-  preencherFormularioEventoUnico,
-  getDadosFormularioEventoUnico,
-  atualizarTabelaEventosUnicos,
-  mostrarFormEventoRecorrente,
-  esconderFormEventoRecorrente,
-  preencherFormularioEventoRecorrente,
-  getDadosFormularioEventoRecorrente,
-  atualizarTabelaEventosRecorrentes,
-  mostrarFormDespesa,
-  esconderFormDespesa,
-  preencherFormularioDespesa,
-  getDadosFormularioDespesa,
-  atualizarTabelaDespesasVariaveis,
   showLoader,
   hideLoader,
-  adicionarTooltips
+  adicionarTooltips,
+  refreshAllTables,
+  depositoManager,
+  eventoUnicoManager,
+  eventoRecorrenteManager,
+  despesaManager,
 } from './ui.js';
 
-import { simularEvolucaoPatrimonial, simularMonteCarlo, simularSequenceOfReturnsRisk } from './calculator.js';
+import {
+  simularEvolucaoPatrimonial,
+  simularMonteCarlo,
+  simularSequenceOfReturnsRisk,
+  calcularAnaliseSensibilidade
+} from './calculator.js';
 import { atualizarGraficos, criarGraficoMonteCarloDistribution, criarGraficoSequenceOfReturns } from './charts.js';
 import { gerarPDF } from './pdf.js';
-import { setLanguage, translateUI } from './i18n.js';
+import { setLanguage, translate, translateUI } from './i18n.js';
 
-// --- Funções de Lógica de Negócio (Handlers) ---
+const itemManagers = {
+  deposito: depositoManager,
+  eventoUnico: eventoUnicoManager,
+  eventoRecorrente: eventoRecorrenteManager,
+  despesa: despesaManager,
+};
 
-function editarDeposito(id) {
-  const dep = dadosApp.depositosDiversificados.find(d => d.id === id);
-  if (!dep) return;
+const itemConfigs = {
+  deposito: {
+    getList: () => dadosApp.depositosDiversificados,
+    setList: (list) => { dadosApp.depositosDiversificados = list; },
+  },
+  eventoUnico: {
+    getList: () => dadosApp.eventosFinanceiros.unicos,
+    setList: (list) => { dadosApp.eventosFinanceiros.unicos = list; },
+  },
+  eventoRecorrente: {
+    getList: () => dadosApp.eventosFinanceiros.recorrentes,
+    setList: (list) => { dadosApp.eventosFinanceiros.recorrentes = list; },
+  },
+  despesa: {
+    getList: () => dadosApp.despesasVariaveis,
+    setList: (list) => { dadosApp.despesasVariaveis = list; },
+  },
+};
 
-  preencherFormularioDeposito(dep);
-  estadoEdicao.deposito = id;
-  mostrarFormDeposito(true);
+const tableToTipo = {
+  tabelaDepositos: 'deposito',
+  tabelaEventosUnicos: 'eventoUnico',
+  tabelaEventosRecorrentes: 'eventoRecorrente',
+  tabelaDespesasVariaveis: 'despesa',
+};
+
+function editarItem(tipo, id) {
+  const manager = itemManagers[tipo];
+  const cfg = itemConfigs[tipo];
+  const item = cfg.getList().find(i => i.id === id);
+  if (!item) return;
+
+  manager.preencherFormulario(item);
+  estadoEdicao[tipo] = id;
+  manager.mostrarForm(true);
 }
 
-function removerDeposito(id) {
-  dadosApp.depositosDiversificados = dadosApp.depositosDiversificados.filter(d => d.id !== id);
-  atualizarTabelaDepositos();
-  salvarDadosNoLocalStorage();
-}
-
-function editarEventoUnico(id) {
-  const ev = dadosApp.eventosFinanceiros.unicos.find(e => e.id === id);
-  if (!ev) return;
-
-  preencherFormularioEventoUnico(ev);
-  estadoEdicao.eventoUnico = id;
-  mostrarFormEventoUnico(true);
-}
-
-function removerEventoUnico(id) {
-  dadosApp.eventosFinanceiros.unicos = dadosApp.eventosFinanceiros.unicos.filter(e => e.id !== id);
-  atualizarTabelaEventosUnicos();
-  salvarDadosNoLocalStorage();
-}
-
-function editarEventoRecorrente(id) {
-  const ev = dadosApp.eventosFinanceiros.recorrentes.find(e => e.id === id);
-  if (!ev) return;
-
-  preencherFormularioEventoRecorrente(ev);
-  estadoEdicao.eventoRecorrente = id;
-  mostrarFormEventoRecorrente(true);
-}
-
-function removerEventoRecorrente(id) {
-  dadosApp.eventosFinanceiros.recorrentes = dadosApp.eventosFinanceiros.recorrentes.filter(e => e.id !== id);
-  atualizarTabelaEventosRecorrentes();
-  salvarDadosNoLocalStorage();
-}
-
-function editarDespesa(id) {
-  const desp = dadosApp.despesasVariaveis.find(d => d.id === id);
-  if (!desp) return;
-
-  preencherFormularioDespesa(desp);
-  estadoEdicao.despesa = id;
-  mostrarFormDespesa(true);
-}
-
-function removerDespesa(id) {
-  dadosApp.despesasVariaveis = dadosApp.despesasVariaveis.filter(d => d.id !== id);
-  atualizarTabelaDespesasVariaveis();
+function removerItem(tipo, id) {
+  const cfg = itemConfigs[tipo];
+  cfg.setList(cfg.getList().filter(i => i.id !== id));
+  itemManagers[tipo].atualizarTabela();
   salvarDadosNoLocalStorage();
 }
 
@@ -113,56 +92,26 @@ function atualizarDadosBasicos() {
 }
 
 function salvarItem(tipo) {
-  const mapping = {
-    deposito: {
-      getDados: getDadosFormularioDeposito,
-      estado: 'deposito',
-      lista: dadosApp.depositosDiversificados,
-      atualizar: atualizarTabelaDepositos,
-      esconder: esconderFormDeposito
-    },
-    eventoUnico: {
-      getDados: getDadosFormularioEventoUnico,
-      estado: 'eventoUnico',
-      lista: dadosApp.eventosFinanceiros.unicos,
-      atualizar: atualizarTabelaEventosUnicos,
-      esconder: esconderFormEventoUnico
-    },
-    eventoRecorrente: {
-      getDados: getDadosFormularioEventoRecorrente,
-      estado: 'eventoRecorrente',
-      lista: dadosApp.eventosFinanceiros.recorrentes,
-      atualizar: atualizarTabelaEventosRecorrentes,
-      esconder: esconderFormEventoRecorrente
-    },
-    despesa: {
-      getDados: getDadosFormularioDespesa,
-      estado: 'despesa',
-      lista: dadosApp.despesasVariaveis,
-      atualizar: atualizarTabelaDespesasVariaveis,
-      esconder: esconderFormDespesa
-    }
-  };
+  const manager = itemManagers[tipo];
+  const cfg = itemConfigs[tipo];
 
-  const config = mapping[tipo];
-  if (!config) return;
-
-  const dadosFormulario = config.getDados();
-  const idEdicao = estadoEdicao[config.estado];
+  const dadosFormulario = manager.getDadosFormulario();
+  const idEdicao = estadoEdicao[tipo];
+  const lista = cfg.getList();
 
   if (idEdicao) {
-    const index = config.lista.findIndex(item => item.id === idEdicao);
+    const index = lista.findIndex(item => item.id === idEdicao);
     if (index !== -1) {
-      config.lista[index] = { ...config.lista[index], ...dadosFormulario };
+      lista[index] = { ...lista[index], ...dadosFormulario };
     }
-    estadoEdicao[config.estado] = null;
+    estadoEdicao[tipo] = null;
   } else {
     const novoItem = { ...dadosFormulario, id: Date.now() };
-    config.lista.push(novoItem);
+    lista.push(novoItem);
   }
 
-  config.atualizar();
-  config.esconder();
+  manager.atualizarTabela();
+  manager.esconderForm();
   salvarDadosNoLocalStorage();
 }
 
@@ -170,18 +119,73 @@ function calcularResultados() {
   atualizarDadosBasicos();
   const resultados = simularEvolucaoPatrimonial();
 
-  // Atualizar a interface com os resultados
   document.getElementById('valorFIRE').textContent = `€${Math.round(resultados.valorFIRE).toLocaleString()}`;
   document.getElementById('idadeFIRE').textContent = resultados.idadeFIRE;
   document.getElementById('taxaRetornoNominal').textContent = `${resultados.taxaRetornoNominal.toFixed(2)}%`;
   document.getElementById('taxaRetornoReal').textContent = `${resultados.taxaRetornoReal.toFixed(2)}%`;
 
   atualizarGraficos(resultados);
+
+  const sensibilidade = calcularAnaliseSensibilidade();
+
+  const retornoDeltas = [-2, -1, 0, 1, 2];
+  const inflacaoDeltas = [-1, 0, 1, 2];
+  const grid = {};
+  let idades = [];
+
+  sensibilidade.forEach(row => {
+    const key = `${row.deltaInflacao},${row.deltaRetorno}`;
+    grid[key] = row.idadeFIRE;
+    if (typeof row.idadeFIRE === 'number') idades.push(row.idadeFIRE);
+  });
+
+  idades.sort((a, b) => a - b);
+  const minAge = idades[0] || 0;
+  const maxAge = idades[idades.length - 1] || 100;
+  const range = maxAge - minAge || 1;
+
+  const fmt = (v) => v >= 0 ? `+${v}%` : `${v}%`;
+  const color = (age) => {
+    if (typeof age !== 'number') return 'var(--color-error-rgb)';
+    const t = (age - minAge) / range;
+    if (t < 0.5) return 'var(--color-success-rgb)';
+    if (t < 0.8) return 'var(--color-warning-rgb)';
+    return 'var(--color-error-rgb)';
+  };
+
+  const container = document.getElementById('sensitivityHeatmap');
+  let html = `<table class="sensitivity-grid"><thead>
+    <tr><th class="sensitivity-grid__axis">${translate('sensitivityInflationLabel')}</th>
+    <th colspan="5" class="sensitivity-grid__return-header">${translate('sensitivityReturnLabel')}</th></tr>
+    <tr><th></th>`;
+  retornoDeltas.forEach(d => {
+    html += `<th>${fmt(d)}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  inflacaoDeltas.forEach((di) => {
+    html += '<tr>';
+    html += `<th class="sensitivity-grid__axis">${fmt(di)}</th>`;
+    retornoDeltas.forEach(dr => {
+      const age = grid[`${di},${dr}`];
+      const ageText = typeof age === 'number' ? age : '—';
+      const rgb = color(age);
+      html += `<td style="--cell-rgb: ${rgb}">
+        <span class="sensitivity-grid__value">${ageText}</span>
+      </td>`;
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  document.getElementById('analiseSensibilidade').classList.add('hidden');
 }
 
 async function calcularResultadosMonteCarlo() {
   showLoader();
-  await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
     atualizarDadosBasicos();
@@ -193,25 +197,22 @@ async function calcularResultadosMonteCarlo() {
     document.getElementById('mcP90').textContent = `€${Math.round(resultadosMC.p90).toLocaleString()}`;
     document.getElementById('mcTaxaSucesso').textContent = `${resultadosMC.taxaDeSucesso.toFixed(1)}%`;
 
-    // Display new probabilistic retirement ages
     document.getElementById('mcIdadeOtimista').textContent =
       typeof resultadosMC.idadesFIRE.otimista === 'number'
         ? `${resultadosMC.idadesFIRE.otimista} anos`
         : resultadosMC.idadesFIRE.otimista;
-    
+
     document.getElementById('mcIdadeMediana').textContent =
       typeof resultadosMC.idadesFIRE.mediana === 'number'
         ? `${resultadosMC.idadesFIRE.mediana} anos`
         : resultadosMC.idadesFIRE.mediana;
-    
+
     document.getElementById('mcIdadePessimista').textContent =
       typeof resultadosMC.idadesFIRE.pessimista === 'number'
         ? `${resultadosMC.idadesFIRE.pessimista} anos`
         : resultadosMC.idadesFIRE.pessimista;
 
-    const resultadosSection = document.getElementById('resultadosMonteCarlo');
-    resultadosSection.classList.remove('hidden');
-
+    document.getElementById('resultadosMonteCarlo').classList.remove('hidden');
     criarGraficoMonteCarloDistribution(resultadosMC.resultados);
   } finally {
     hideLoader();
@@ -243,19 +244,18 @@ function importarDados() {
     reader.onload = (e) => {
       try {
         const dadosImportados = JSON.parse(e.target.result);
-        // Validação básica dos dados importados
         if (dadosImportados && dadosImportados.dadosBasicos) {
           Object.assign(dadosApp, dadosImportados);
           salvarDadosNoLocalStorage();
           popularDadosIniciais();
           calcularResultados();
-          alert('Dados importados com sucesso!');
+          alert(translate('successDataImported'));
         } else {
-          alert('Arquivo de dados inválido.');
+          alert(translate('errorInvalidDataFile'));
         }
       } catch (error) {
-        alert('Erro ao ler o arquivo de dados.');
-        console.error('Erro ao importar dados:', error);
+        alert(translate('errorReadingDataFile'));
+        console.error('Error importing data:', error);
       }
     };
     reader.readAsText(file);
@@ -265,7 +265,7 @@ function importarDados() {
 
 async function calcularSRR() {
   showLoader();
-  await new Promise(resolve => setTimeout(resolve, 50)); // Allow UI to update
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
     const srrDuration = parseInt(document.getElementById('srrDuration').value, 10);
@@ -274,16 +274,12 @@ async function calcularSRR() {
     const originalResults = simularEvolucaoPatrimonial();
     const stressResults = simularSequenceOfReturnsRisk(srrDuration, srrReturn);
 
-    const srrSection = document.getElementById('sequenceOfReturnsRisk');
-    srrSection.classList.remove('hidden');
-
+    document.getElementById('sequenceOfReturnsRisk').classList.remove('hidden');
     criarGraficoSequenceOfReturns(originalResults.historicoPatrimonialAnual, stressResults.historicoPatrimonialAnual);
   } finally {
     hideLoader();
   }
 }
-
-// --- Configuração de Event Listeners ---
 
 function handleTableActions(event) {
   const target = event.target;
@@ -295,24 +291,11 @@ function handleTableActions(event) {
 
   if (!action || !id || !table) return;
 
-  switch (table.id) {
-  case 'tabelaDepositos':
-    if (action === 'editar') editarDeposito(id);
-    else if (action === 'remover') removerDeposito(id);
-    break;
-  case 'tabelaEventosUnicos':
-    if (action === 'editar') editarEventoUnico(id);
-    else if (action === 'remover') removerEventoUnico(id);
-    break;
-  case 'tabelaEventosRecorrentes':
-    if (action === 'editar') editarEventoRecorrente(id);
-    else if (action === 'remover') removerEventoRecorrente(id);
-    break;
-  case 'tabelaDespesasVariaveis':
-    if (action === 'editar') editarDespesa(id);
-    else if (action === 'remover') removerDespesa(id);
-    break;
-  }
+  const tipo = tableToTipo[table.id];
+  if (!tipo) return;
+
+  if (action === 'editar') editarItem(tipo, id);
+  else if (action === 'remover') removerItem(tipo, id);
 }
 
 const investmentTemplates = {
@@ -338,61 +321,49 @@ function aplicarTemplateInvestimento(nomeTemplate) {
 
   const templateDeposits = JSON.parse(JSON.stringify(investmentTemplates[nomeTemplate]));
 
-  // Se já existirem depósitos, perguntar ao utilizador
-  if (dadosApp.depositosDiversificados.length > 0 && confirm('Deseja adicionar os depósitos do template à sua lista existente? \n\nOK = Adicionar \nCancelar = Substituir a lista atual')) {
-    // Adicionar aos existentes
+  if (dadosApp.depositosDiversificados.length > 0 && confirm(translate('confirmAddTemplate'))) {
     const maxId = Math.max(0, ...dadosApp.depositosDiversificados.map(d => d.id));
     templateDeposits.forEach((dep, index) => {
-      // Garantir IDs únicos
       dep.id = maxId + 1 + index;
     });
     dadosApp.depositosDiversificados.push(...templateDeposits);
   } else {
-    // Substituir
     dadosApp.depositosDiversificados = templateDeposits;
   }
 
-  atualizarTabelaDepositos();
+  depositoManager.atualizarTabela();
   salvarDadosNoLocalStorage();
   calcularResultados();
-
-  // Resetar o seletor para o valor padrão para evitar reaplicação acidental
   document.getElementById('investmentTemplate').value = '';
 }
 
 function salvarTemplatePersonalizado() {
-  const nomeTemplate = prompt('Digite um nome para o seu novo template de investimentos:');
+  const nomeTemplate = prompt(translate('promptTemplateName'));
   if (!nomeTemplate || nomeTemplate.trim() === '') {
-    alert('O nome do template não pode estar vazio.');
+    alert(translate('errorEmptyTemplateName'));
     return;
   }
 
   const nomeNormalizado = nomeTemplate.trim().toLowerCase();
   if (investmentTemplates[nomeNormalizado]) {
-    alert('Já existe um template com esse nome. Por favor, escolha outro.');
+    alert(translate('errorTemplateNameExists'));
     return;
   }
 
   if (dadosApp.depositosDiversificados.length === 0) {
-    alert('Não existem depósitos na lista para salvar como um template.');
+    alert(translate('errorNoDepositsToSave'));
     return;
   }
 
-  // Clonar os depósitos atuais para o novo template
   const novoTemplate = JSON.parse(JSON.stringify(dadosApp.depositosDiversificados));
-
-  // Adicionar ao objeto de templates em memória
   investmentTemplates[nomeNormalizado] = novoTemplate;
 
-  // Guardar nos templates personalizados no localStorage
   const customTemplates = JSON.parse(localStorage.getItem('customInvestmentTemplates')) || {};
   customTemplates[nomeNormalizado] = novoTemplate;
   localStorage.setItem('customInvestmentTemplates', JSON.stringify(customTemplates));
 
-  // Atualizar a lista dropdown
   carregarTemplatesPersonalizados();
-
-  alert(`Template "${nomeTemplate}" salvo com sucesso!`);
+  alert(translate('successTemplateSaved').replace('{templateName}', nomeTemplate));
 }
 
 function carregarTemplatesPersonalizados() {
@@ -400,29 +371,27 @@ function carregarTemplatesPersonalizados() {
   const optgroup = document.getElementById('customTemplatesOptgroup');
   if (!optgroup) return;
 
-  optgroup.innerHTML = ''; // Limpar para evitar duplicados
+  optgroup.innerHTML = '';
   let hasCustomTemplates = false;
 
   for (const nomeTemplate in customTemplates) {
     if (Object.hasOwnProperty.call(customTemplates, nomeTemplate)) {
       hasCustomTemplates = true;
-      // Adicionar ao objeto de templates em memória se ainda não existir
       if (!investmentTemplates[nomeTemplate]) {
         investmentTemplates[nomeTemplate] = customTemplates[nomeTemplate];
       }
 
-      // Adicionar à lista dropdown
       const option = document.createElement('option');
       option.value = nomeTemplate;
-      option.textContent = nomeTemplate.charAt(0).toUpperCase() + nomeTemplate.slice(1); // Capitalize
+      option.textContent = nomeTemplate.charAt(0).toUpperCase() + nomeTemplate.slice(1);
       optgroup.appendChild(option);
     }
   }
   optgroup.hidden = !hasCustomTemplates;
 }
+
 function configurarEventListeners() {
   const mainContainer = document.querySelector('main.container');
-    
   mainContainer.addEventListener('click', handleTableActions);
 
   document.getElementById('formDadosBasicos').addEventListener('change', () => {
@@ -430,38 +399,30 @@ function configurarEventListeners() {
     calcularResultados();
     calcularResultadosMonteCarlo();
   });
+
   document.getElementById('btnCalcular').addEventListener('click', calcularResultados);
   document.getElementById('btnCalcularMonteCarlo').addEventListener('click', calcularResultadosMonteCarlo);
-  document.getElementById('btnDownloadPDF').addEventListener('click', (e) => {
-    console.log('PDF download button clicked');
-    console.log('gerarPDF function:', typeof gerarPDF);
-    gerarPDF();
-  });
+  document.getElementById('btnDownloadPDF').addEventListener('click', gerarPDF);
   document.getElementById('btnExportarDados').addEventListener('click', exportarDados);
   document.getElementById('btnImportarDados').addEventListener('click', importarDados);
   document.getElementById('btnSalvarTemplate').addEventListener('click', salvarTemplatePersonalizado);
 
-  // Depósitos
-  document.getElementById('btnAdicionarDeposito').addEventListener('click', mostrarFormDeposito);
+  document.getElementById('btnAdicionarDeposito').addEventListener('click', () => depositoManager.mostrarForm());
   document.getElementById('btnSalvarDeposito').addEventListener('click', () => salvarItem('deposito'));
-  document.getElementById('btnCancelarDeposito').addEventListener('click', esconderFormDeposito);
+  document.getElementById('btnCancelarDeposito').addEventListener('click', () => depositoManager.esconderForm());
 
-  // Eventos Únicos
-  document.getElementById('btnAdicionarEventoUnico').addEventListener('click', mostrarFormEventoUnico);
+  document.getElementById('btnAdicionarEventoUnico').addEventListener('click', () => eventoUnicoManager.mostrarForm());
   document.getElementById('btnSalvarEventoUnico').addEventListener('click', () => salvarItem('eventoUnico'));
-  document.getElementById('btnCancelarEventoUnico').addEventListener('click', esconderFormEventoUnico);
+  document.getElementById('btnCancelarEventoUnico').addEventListener('click', () => eventoUnicoManager.esconderForm());
 
-  // Eventos Recorrentes
-  document.getElementById('btnAdicionarEventoRecorrente').addEventListener('click', mostrarFormEventoRecorrente);
+  document.getElementById('btnAdicionarEventoRecorrente').addEventListener('click', () => eventoRecorrenteManager.mostrarForm());
   document.getElementById('btnSalvarEventoRecorrente').addEventListener('click', () => salvarItem('eventoRecorrente'));
-  document.getElementById('btnCancelarEventoRecorrente').addEventListener('click', esconderFormEventoRecorrente);
+  document.getElementById('btnCancelarEventoRecorrente').addEventListener('click', () => eventoRecorrenteManager.esconderForm());
 
-  // Despesas
-  document.getElementById('btnAdicionarDespesa').addEventListener('click', mostrarFormDespesa);
+  document.getElementById('btnAdicionarDespesa').addEventListener('click', () => despesaManager.mostrarForm());
   document.getElementById('btnSalvarDespesa').addEventListener('click', () => salvarItem('despesa'));
-  document.getElementById('btnCancelarDespesa').addEventListener('click', esconderFormDespesa);
-    
-  // Slider
+  document.getElementById('btnCancelarDespesa').addEventListener('click', () => despesaManager.esconderForm());
+
   const taxaRetiradaSlider = document.getElementById('taxaRetirada');
   taxaRetiradaSlider.addEventListener('input', (e) => {
     document.getElementById('taxaRetiradaValue').textContent = e.target.value + '%';
@@ -469,50 +430,56 @@ function configurarEventListeners() {
     salvarDadosNoLocalStorage();
   });
 
-  // Investment Template Selector
   document.getElementById('investmentTemplate').addEventListener('change', (e) => {
     const template = e.target.value;
     if (template) {
       aplicarTemplateInvestimento(template);
     }
   });
-  // Chart Controls
+
   document.getElementById('chart-granularity').addEventListener('change', calcularResultados);
-   
+
   const periodButtons = document.querySelectorAll('.btn-group[role="toolbar"] .btn');
+  const granularitySelect = document.getElementById('chart-granularity');
   periodButtons.forEach(button => {
     button.addEventListener('click', (e) => {
       periodButtons.forEach(btn => btn.classList.remove('active'));
       e.currentTarget.classList.add('active');
+      const period = e.currentTarget.dataset.period;
+      if (period === '1M' || period === '6M') {
+        granularitySelect.value = 'mensal';
+      }
       calcularResultados();
     });
   });
 
   document.getElementById('btnSimularSRR').addEventListener('click', calcularSRR);
+
+  window.addEventListener('language-changed', () => {
+    refreshAllTables();
+    adicionarTooltips();
+  });
 }
 
-// --- Theme Toggle ---
 function setupThemeToggle() {
   const themeToggle = document.getElementById('theme-toggle');
   const sunIcon = themeToggle.querySelector('.sun');
   const moonIcon = themeToggle.querySelector('.moon');
-  
-  // Check for saved theme preference or system preference
+
   const savedTheme = localStorage.getItem('color-scheme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  
   let currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
   applyTheme(currentTheme);
-  
+
   themeToggle.addEventListener('click', () => {
     currentTheme = currentTheme === 'light' ? 'dark' : 'light';
     applyTheme(currentTheme);
     localStorage.setItem('color-scheme', currentTheme);
   });
-  
+
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-color-scheme', theme);
-    
+
     if (theme === 'dark') {
       sunIcon.classList.remove('hidden');
       moonIcon.classList.add('hidden');
@@ -523,7 +490,6 @@ function setupThemeToggle() {
   }
 }
 
-// --- Language Switcher ---
 function setupLanguageSwitcher() {
   const langSelector = document.getElementById('lang-selector');
   const langDropdown = document.getElementById('lang-dropdown');
@@ -548,18 +514,16 @@ function setupLanguageSwitcher() {
   });
 }
 
-// --- Inicialização da Aplicação ---
-
 async function inicializarApp() {
   showLoader();
   try {
     setupThemeToggle();
     setupLanguageSwitcher();
-    await setLanguage('pt'); // Set default language
+    await setLanguage('pt');
     carregarDadosDoLocalStorage();
     configurarEventListeners();
     popularDadosIniciais();
-    carregarTemplatesPersonalizados(); // Carregar templates guardados
+    carregarTemplatesPersonalizados();
     await calcularResultados();
     await calcularResultadosMonteCarlo();
     translateUI();

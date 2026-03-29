@@ -1,11 +1,3 @@
-import {
-  atualizarTabelaDepositos,
-  atualizarTabelaEventosUnicos,
-  atualizarTabelaEventosRecorrentes,
-  atualizarTabelaDespesasVariaveis,
-  adicionarTooltips
-} from './ui.js';
-
 let translations = {};
 let currentLanguage = 'pt';
 
@@ -28,15 +20,10 @@ function translate(key) {
 
 function setLanguage(lang) {
   currentLanguage = lang;
-  loadTranslations(lang).then(() => {
+  return loadTranslations(lang).then(() => {
     translateUI();
     updateLangSelector(lang);
-    adicionarTooltips();
-    // Re-render tables to apply translations
-    atualizarTabelaDepositos();
-    atualizarTabelaEventosUnicos();
-    atualizarTabelaEventosRecorrentes();
-    atualizarTabelaDespesasVariaveis();
+    window.dispatchEvent(new CustomEvent('language-changed', { detail: { lang } }));
   });
 }
 

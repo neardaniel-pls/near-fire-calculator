@@ -1,5 +1,7 @@
 # Calculadora FIRE Portugal 🇵🇹
 
+📌 Versão em inglês disponível abaixo / English version available below
+
 Esta é uma ferramenta de código aberto, criada a pensar na comunidade portuguesa de independência financeira. O objetivo é simples: oferecer uma calculadora completa e transparente para quem quer planear a sua jornada para a independência financeira (FIRE - Financial Independence, Retire Early).
 
 ## Porque Criei Esta Calculadora?
@@ -38,3 +40,46 @@ Esta é uma ferramenta para fins educacionais. Os resultados são projeções e 
 ---
 
 **Feito com ❤️ para a comunidade FIRE portuguesa.**
+
+---
+
+# FIRE Calculator Portugal 🇵🇹
+
+This is an open-source tool created with the Portuguese financial independence community in mind. The goal is simple: to provide a complete and transparent calculator for those who want to plan their journey to financial independence (FIRE - Financial Independence, Retire Early).
+
+## Why I Created This Calculator?
+
+Many of the tools I found online were too simple or focused on the American market. Something was missing that would adapt to our reality, allow simulating more complex scenarios, and, above all, be transparent about how calculations are made.
+
+This calculator was born from that need. It's a tool for the community, where anyone can see the code, understand the logic, and even contribute improvements.
+
+## Main Features
+
+*   **Monte Carlo Simulation:** Tests the robustness of your financial plan against market volatility. Instead of a single projection, the Monte Carlo simulation creates thousands of possible scenarios, giving you a much more realistic view of success probabilities.
+*   **Detailed Portfolio Management:** Add different types of investments (ETFs, PPRs, Stocks, etc.), each with its own rate of return and volatility (standard deviation).
+*   **Financial Events:** Simulate unique events (like an inheritance or a down payment for a house) and recurring events (like an annual bonus or rent).
+*   **Investment Templates:** Get started quickly with predefined profiles (Conservative, Moderate, Aggressive) or create and save your own investment portfolio.
+*   **Reports and Export:** Save your data for later or export a PDF report with your projection.
+
+## How to Use
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/neardaniel-pls/calculadora-fire.git
+    cd calculadora-fire
+    ```
+2.  **Open `index.html` in your browser.** The easiest way is to use the **Live Server** extension in Visual Studio Code.
+
+Then, just fill in your data and start simulating!
+
+## Contributions
+
+This project is for the community. If you have ideas, suggestions, or want to help improve the calculator, your contributions are very welcome! Open a Pull Request or create an Issue with your suggestion.
+
+## Legal Disclaimer
+
+This is a tool for educational purposes. The results are projections and should not be considered as financial advice. Always consult a professional before making investment decisions.
+
+---
+
+**Made with ❤️ for the Portuguese FIRE community.**

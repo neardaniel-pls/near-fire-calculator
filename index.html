@@ -454,22 +454,9 @@
         <section id="analiseSensibilidade" class="card section hidden">
             <div class="card__header">
                 <h2 data-i18n-key="sensitivityAnalysis">Análise de Sensibilidade</h2>
-   </div>
-   <div class="card__body">
-                <p data-i18n-key="sensitivityAnalysisDescription">Esta análise mostra como a sua Idade FIRE pode variar com pequenas alterações nos seus pressupostos de retorno e inflação.</p>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th data-i18n-key="scenario">Cenário</th>
-                                <th data-i18n-key="resultingFireAge">Idade FIRE Resultante</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelaAnaliseSensibilidade">
-                            <!-- Os resultados da análise serão inseridos aqui -->
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="card__body">
+                <div id="sensitivityHeatmap" class="sensitivity-heatmap"></div>
             </div>
         </section>
 <section id="sequenceOfReturnsRisk" class="card section hidden">

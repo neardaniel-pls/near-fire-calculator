@@ -1,276 +1,203 @@
 import { dadosApp, estadoEdicao } from './state.js';
-import { translate } from './i18n.js';
+import { translate, currentLanguage } from './i18n.js';
 
-// Funções de UI para Depósitos
-function mostrarFormDeposito(isEditing = false) {
-  document.getElementById('formNovoDeposito').classList.remove('hidden');
-  document.getElementById('btnSalvarDeposito').textContent = isEditing ? translate('update') : translate('save');
-}
+function createFormManager(config) {
+  function mostrarForm(isEditing = false) {
+    document.getElementById(config.formId).classList.remove('hidden');
+    document.getElementById(config.saveBtnId).textContent = isEditing ? translate('update') : translate('save');
+  }
 
-function esconderFormDeposito() {
-  document.getElementById('formNovoDeposito').classList.add('hidden');
-  limparFormDeposito();
-}
+  function esconderForm() {
+    document.getElementById(config.formId).classList.add('hidden');
+    limparForm();
+  }
 
-function limparFormDeposito() {
-  document.getElementById('tipoInvestimento').value = '';
-  document.getElementById('valorMensal').value = '';
-  document.getElementById('taxaEsperada').value = '';
-  document.getElementById('desvioPadrao').value = '15';
-  document.getElementById('dataInicio').value = '';
-  document.getElementById('dataFim').value = '';
-  document.getElementById('descricaoInvestimento').value = '';
-  estadoEdicao.deposito = null;
-  document.getElementById('btnSalvarDeposito').textContent = translate('save');
-}
+  function limparForm() {
+    config.fields.forEach(field => {
+      const el = document.getElementById(field.id);
+      if (el) {
+        el.value = field.default !== undefined ? field.default : '';
+      }
+    });
+    estadoEdicao[config.editStateKey] = null;
+    document.getElementById(config.saveBtnId).textContent = translate('save');
+  }
 
+  function preencherFormulario(data) {
+    config.fields.forEach(field => {
+      const el = document.getElementById(field.id);
+      if (el && data[field.key] !== undefined) {
+        el.value = data[field.key];
+      }
+    });
+  }
 
-function preencherFormularioDeposito(deposito) {
-  document.getElementById('tipoInvestimento').value = deposito.tipo;
-  document.getElementById('valorMensal').value = deposito.valorMensal;
-  document.getElementById('taxaEsperada').value = deposito.taxaEsperada;
-  document.getElementById('desvioPadrao').value = deposito.desvioPadrao;
-  document.getElementById('dataInicio').value = deposito.dataInicio;
-  document.getElementById('dataFim').value = deposito.dataFim;
-  document.getElementById('descricaoInvestimento').value = deposito.descricao;
-}
+  function getDadosFormulario() {
+    const data = {};
+    config.fields.forEach(field => {
+      const el = document.getElementById(field.id);
+      if (!el) return;
+      if (field.type === 'number') {
+        data[field.key] = parseFloat(el.value) || (field.default !== undefined ? field.default : 0);
+      } else {
+        data[field.key] = el.value || '';
+      }
+    });
+    return data;
+  }
 
-function getDadosFormularioDeposito() {
+  function atualizarTabela() {
+    const tbody = document.querySelector(config.tableSelector);
+    tbody.innerHTML = '';
+
+    const items = config.getList();
+    items.forEach(item => {
+      const row = document.createElement('tr');
+      row.innerHTML = config.renderRow(item);
+      tbody.appendChild(row);
+    });
+
+    if (config.onUpdate) {
+      config.onUpdate();
+    }
+  }
+
   return {
-    tipo: document.getElementById('tipoInvestimento').value,
-    valorMensal: parseFloat(document.getElementById('valorMensal').value) || 0,
-    taxaEsperada: parseFloat(document.getElementById('taxaEsperada').value) || 0,
-    desvioPadrao: parseFloat(document.getElementById('desvioPadrao').value) || 0,
-    dataInicio: document.getElementById('dataInicio').value,
-    dataFim: document.getElementById('dataFim').value,
-    descricao: document.getElementById('descricaoInvestimento').value
+    mostrarForm,
+    esconderForm,
+    preencherFormulario,
+    getDadosFormulario,
+    atualizarTabela,
   };
 }
 
-function atualizarTabelaDepositos() {
-  const tbody = document.querySelector('#tabelaDepositos tbody');
-  tbody.innerHTML = '';
-    
-  dadosApp.depositosDiversificados.forEach(deposito => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-            <td>${deposito.tipo}</td>
-            <td>€${deposito.valorMensal.toLocaleString()}</td>
-            <td>${deposito.taxaEsperada}%</td>
-            <td>${deposito.desvioPadrao}%</td>
-            <td>${new Date(deposito.dataInicio).toLocaleDateString('pt-PT')}</td>
-            <td>${new Date(deposito.dataFim).toLocaleDateString('pt-PT')}</td>
-            <td>${deposito.descricao}</td>
-            <td>
-                <button class="btn-action btn-edit" data-action="editar" data-id="${deposito.id}">${translate('edit')}</button>
-                <button class="btn-action btn-remove" data-action="remover" data-id="${deposito.id}">${translate('remove')}</button>
-            </td>
-        `;
-    tbody.appendChild(row);
-  });
-    
-  calcularTaxaRetornoPonderada();
-}
+const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+const locale = () => {
+  const lang = typeof currentLanguage !== 'undefined' ? currentLanguage : 'pt';
+  return lang === 'en' ? 'en-GB' : 'pt-PT';
+};
+
+const depositoManager = createFormManager({
+  formId: 'formNovoDeposito',
+  saveBtnId: 'btnSalvarDeposito',
+  tableSelector: '#tabelaDepositos tbody',
+  editStateKey: 'deposito',
+  getList: () => dadosApp.depositosDiversificados,
+  fields: [
+    { id: 'tipoInvestimento', key: 'tipo', type: 'text' },
+    { id: 'valorMensal', key: 'valorMensal', type: 'number', default: 0 },
+    { id: 'taxaEsperada', key: 'taxaEsperada', type: 'number', default: 0 },
+    { id: 'desvioPadrao', key: 'desvioPadrao', type: 'number', default: 15 },
+    { id: 'dataInicio', key: 'dataInicio', type: 'text' },
+    { id: 'dataFim', key: 'dataFim', type: 'text' },
+    { id: 'descricaoInvestimento', key: 'descricao', type: 'text' },
+  ],
+  renderRow: (dep) => `
+    <td>${dep.tipo}</td>
+    <td>€${dep.valorMensal.toLocaleString()}</td>
+    <td>${dep.taxaEsperada}%</td>
+    <td>${dep.desvioPadrao}%</td>
+    <td>${new Date(dep.dataInicio).toLocaleDateString(locale())}</td>
+    <td>${new Date(dep.dataFim).toLocaleDateString(locale())}</td>
+    <td>${dep.descricao}</td>
+    <td>
+      <button class="btn-action btn-edit" data-action="editar" data-id="${dep.id}">${translate('edit')}</button>
+      <button class="btn-action btn-remove" data-action="remover" data-id="${dep.id}">${translate('remove')}</button>
+    </td>`,
+  onUpdate: calcularTaxaRetornoPonderada,
+});
+
+const eventoUnicoManager = createFormManager({
+  formId: 'formNovoEventoUnico',
+  saveBtnId: 'btnSalvarEventoUnico',
+  tableSelector: '#tabelaEventosUnicos tbody',
+  editStateKey: 'eventoUnico',
+  getList: () => dadosApp.eventosFinanceiros.unicos,
+  fields: [
+    { id: 'anoEvento', key: 'ano', type: 'number', default: new Date().getFullYear() },
+    { id: 'mesEvento', key: 'mes', type: 'number', default: 1 },
+    { id: 'tipoEvento', key: 'tipo', type: 'text', default: 'Depósito' },
+    { id: 'valorEvento', key: 'valor', type: 'number', default: 0 },
+    { id: 'descricaoEvento', key: 'descricao', type: 'text' },
+  ],
+  renderRow: (evento) => `
+    <td>${evento.ano}</td>
+    <td>${NOMES_MESES[evento.mes - 1]}</td>
+    <td>${evento.tipo}</td>
+    <td>€${evento.valor.toLocaleString()}</td>
+    <td>${evento.descricao}</td>
+    <td>
+      <button class="btn-action btn-edit" data-action="editar" data-id="${evento.id}">${translate('edit')}</button>
+      <button class="btn-action btn-remove" data-action="remover" data-id="${evento.id}">${translate('remove')}</button>
+    </td>`,
+});
+
+const eventoRecorrenteManager = createFormManager({
+  formId: 'formNovoEventoRecorrente',
+  saveBtnId: 'btnSalvarEventoRecorrente',
+  tableSelector: '#tabelaEventosRecorrentes tbody',
+  editStateKey: 'eventoRecorrente',
+  getList: () => dadosApp.eventosFinanceiros.recorrentes,
+  fields: [
+    { id: 'anoInicioEvento', key: 'anoInicio', type: 'number', default: new Date().getFullYear() },
+    { id: 'anoFimEvento', key: 'anoFim', type: 'number', default: new Date().getFullYear() },
+    { id: 'tipoEventoRecorrente', key: 'tipo', type: 'text', default: 'Depósito' },
+    { id: 'periodicidadeEvento', key: 'periodicidade', type: 'text', default: 'Mensal' },
+    { id: 'valorPeriodoEvento', key: 'valorPeriodo', type: 'number', default: 0 },
+    { id: 'descricaoEventoRecorrente', key: 'descricao', type: 'text' },
+  ],
+  renderRow: (evento) => {
+    const tipo = evento.tipo || 'Depósito';
+    return `
+    <td>${evento.anoInicio}-${evento.anoFim}</td>
+    <td>${tipo}</td>
+    <td>${evento.periodicidade}</td>
+    <td>€${evento.valorPeriodo.toLocaleString()}</td>
+    <td>${evento.descricao}</td>
+    <td>
+      <button class="btn-action btn-edit" data-action="editar" data-id="${evento.id}">${translate('edit')}</button>
+      <button class="btn-action btn-remove" data-action="remover" data-id="${evento.id}">${translate('remove')}</button>
+    </td>`;
+  },
+});
+
+const despesaManager = createFormManager({
+  formId: 'formNovaDespesa',
+  saveBtnId: 'btnSalvarDespesa',
+  tableSelector: '#tabelaDespesasVariaveis tbody',
+  editStateKey: 'despesa',
+  getList: () => dadosApp.despesasVariaveis,
+  fields: [
+    { id: 'descricaoDespesa', key: 'descricao', type: 'text' },
+    { id: 'valorMensalDespesa', key: 'valorMensal', type: 'number', default: 0 },
+    { id: 'anoInicioDespesa', key: 'anoInicio', type: 'number', default: new Date().getFullYear() },
+    { id: 'anoFimDespesa', key: 'anoFim', type: 'number', default: new Date().getFullYear() },
+  ],
+  renderRow: (despesa) => `
+    <td>${despesa.descricao}</td>
+    <td>€${despesa.valorMensal.toLocaleString()}</td>
+    <td>${despesa.anoInicio}</td>
+    <td>${despesa.anoFim}</td>
+    <td>
+      <button class="btn-action btn-edit" data-action="editar" data-id="${despesa.id}">${translate('edit')}</button>
+      <button class="btn-action btn-remove" data-action="remover" data-id="${despesa.id}">${translate('remove')}</button>
+    </td>`,
+});
 
 function calcularTaxaRetornoPonderada() {
   let totalValor = 0;
   let somaValorada = 0;
-    
+
   dadosApp.depositosDiversificados.forEach(deposito => {
     totalValor += deposito.valorMensal;
     somaValorada += deposito.valorMensal * deposito.taxaEsperada;
   });
-    
+
   const taxaPonderada = totalValor > 0 ? (somaValorada / totalValor) : 0;
   document.getElementById('taxaRetornoPonderada').textContent = taxaPonderada.toFixed(2) + '%';
 }
 
-
-// Funções de UI para Eventos Únicos
-function mostrarFormEventoUnico(isEditing = false) {
-  document.getElementById('formNovoEventoUnico').classList.remove('hidden');
-  document.getElementById('btnSalvarEventoUnico').textContent = isEditing ? translate('update') : translate('save');
-}
-
-function esconderFormEventoUnico() {
-  document.getElementById('formNovoEventoUnico').classList.add('hidden');
-  limparFormEventoUnico();
-}
-
-function limparFormEventoUnico() {
-  document.getElementById('anoEvento').value = '';
-  document.getElementById('mesEvento').value = '1';
-  document.getElementById('tipoEvento').value = 'Depósito';
-  document.getElementById('valorEvento').value = '';
-  document.getElementById('descricaoEvento').value = '';
-  estadoEdicao.eventoUnico = null;
-  document.getElementById('btnSalvarEventoUnico').textContent = translate('save');
-}
-
-
-function preencherFormularioEventoUnico(evento) {
-  document.getElementById('anoEvento').value = evento.ano;
-  document.getElementById('mesEvento').value = evento.mes;
-  document.getElementById('tipoEvento').value = evento.tipo;
-  document.getElementById('valorEvento').value = evento.valor;
-  document.getElementById('descricaoEvento').value = evento.descricao;
-}
-
-function getDadosFormularioEventoUnico() {
-  return {
-    ano: parseInt(document.getElementById('anoEvento').value) || new Date().getFullYear(),
-    mes: parseInt(document.getElementById('mesEvento').value) || 1,
-    tipo: document.getElementById('tipoEvento').value,
-    valor: parseFloat(document.getElementById('valorEvento').value) || 0,
-    descricao: document.getElementById('descricaoEvento').value
-  };
-}
-
-function atualizarTabelaEventosUnicos() {
-  const tbody = document.querySelector('#tabelaEventosUnicos tbody');
-  tbody.innerHTML = '';
-  const nomesMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-
-  dadosApp.eventosFinanceiros.unicos.forEach(evento => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-            <td>${evento.ano}</td>
-            <td>${nomesMeses[evento.mes - 1]}</td>
-            <td>${evento.tipo}</td>
-            <td>€${evento.valor.toLocaleString()}</td>
-            <td>${evento.descricao}</td>
-            <td>
-                <button class="btn-action btn-edit" data-action="editar" data-id="${evento.id}">${translate('edit')}</button>
-                <button class="btn-action btn-remove" data-action="remover" data-id="${evento.id}">${translate('remove')}</button>
-            </td>
-        `;
-    tbody.appendChild(row);
-  });
-}
-
-// Funções de UI para Eventos Recorrentes
-function mostrarFormEventoRecorrente(isEditing = false) {
-  document.getElementById('formNovoEventoRecorrente').classList.remove('hidden');
-  document.getElementById('btnSalvarEventoRecorrente').textContent = isEditing ? translate('update') : translate('save');
-}
-
-function esconderFormEventoRecorrente() {
-  document.getElementById('formNovoEventoRecorrente').classList.add('hidden');
-  limparFormEventoRecorrente();
-}
-
-function limparFormEventoRecorrente() {
-  document.getElementById('anoInicioEvento').value = '';
-  document.getElementById('anoFimEvento').value = '';
-  document.getElementById('tipoEventoRecorrente').value = 'Depósito';
-  document.getElementById('periodicidadeEvento').value = 'Mensal';
-  document.getElementById('valorPeriodoEvento').value = '';
-  document.getElementById('descricaoEventoRecorrente').value = '';
-  estadoEdicao.eventoRecorrente = null;
-  document.getElementById('btnSalvarEventoRecorrente').textContent = translate('save');
-}
-
-
-function preencherFormularioEventoRecorrente(evento) {
-  document.getElementById('anoInicioEvento').value = evento.anoInicio;
-  document.getElementById('anoFimEvento').value = evento.anoFim;
-  document.getElementById('tipoEventoRecorrente').value = evento.tipo ?? 'Depósito';
-  document.getElementById('periodicidadeEvento').value = evento.periodicidade;
-  document.getElementById('valorPeriodoEvento').value = evento.valorPeriodo;
-  document.getElementById('descricaoEventoRecorrente').value = evento.descricao;
-}
-
-function getDadosFormularioEventoRecorrente() {
-  return {
-    anoInicio: parseInt(document.getElementById('anoInicioEvento').value) || new Date().getFullYear(),
-    anoFim: parseInt(document.getElementById('anoFimEvento').value) || new Date().getFullYear(),
-    tipo: document.getElementById('tipoEventoRecorrente').value,
-    periodicidade: document.getElementById('periodicidadeEvento').value,
-    valorPeriodo: parseFloat(document.getElementById('valorPeriodoEvento').value) || 0,
-    descricao: document.getElementById('descricaoEventoRecorrente').value
-  };
-}
-
-function atualizarTabelaEventosRecorrentes() {
-  const tbody = document.querySelector('#tabelaEventosRecorrentes tbody');
-  tbody.innerHTML = '';
-
-  dadosApp.eventosFinanceiros.recorrentes.forEach(evento => {
-    const tipo = evento.tipo || 'Depósito';
-    const row = document.createElement('tr');
-    row.innerHTML = `
-            <td>${evento.anoInicio}-${evento.anoFim}</td>
-            <td>${tipo}</td>
-            <td>${evento.periodicidade}</td>
-            <td>€${evento.valorPeriodo.toLocaleString()}</td>
-            <td>${evento.descricao}</td>
-            <td>
-                <button class="btn-action btn-edit" data-action="editar" data-id="${evento.id}">${translate('edit')}</button>
-                <button class="btn-action btn-remove" data-action="remover" data-id="${evento.id}">${translate('remove')}</button>
-            </td>
-            `;
-    tbody.appendChild(row);
-  });
-}
-
-// Funções de UI para Despesas Variáveis
-function mostrarFormDespesa(isEditing = false) {
-  document.getElementById('formNovaDespesa').classList.remove('hidden');
-  document.getElementById('btnSalvarDespesa').textContent = isEditing ? translate('update') : translate('save');
-}
-
-function esconderFormDespesa() {
-  document.getElementById('formNovaDespesa').classList.add('hidden');
-  limparFormDespesa();
-}
-
-function limparFormDespesa() {
-  document.getElementById('descricaoDespesa').value = '';
-  document.getElementById('valorMensalDespesa').value = '';
-  document.getElementById('anoInicioDespesa').value = '';
-  document.getElementById('anoFimDespesa').value = '';
-  estadoEdicao.despesa = null;
-  document.getElementById('btnSalvarDespesa').textContent = translate('save');
-}
-
-
-function preencherFormularioDespesa(despesa) {
-  document.getElementById('descricaoDespesa').value = despesa.descricao;
-  document.getElementById('valorMensalDespesa').value = despesa.valorMensal;
-  document.getElementById('anoInicioDespesa').value = despesa.anoInicio;
-  document.getElementById('anoFimDespesa').value = despesa.anoFim;
-}
-
-function getDadosFormularioDespesa() {
-  return {
-    descricao: document.getElementById('descricaoDespesa').value,
-    valorMensal: parseFloat(document.getElementById('valorMensalDespesa').value) || 0,
-    anoInicio: parseInt(document.getElementById('anoInicioDespesa').value) || new Date().getFullYear(),
-    anoFim: parseInt(document.getElementById('anoFimDespesa').value) || new Date().getFullYear()
-  };
-}
-
-function atualizarTabelaDespesasVariaveis() {
-  const tbody = document.querySelector('#tabelaDespesasVariaveis tbody');
-  tbody.innerHTML = '';
-    
-  dadosApp.despesasVariaveis.forEach(despesa => {
-    const row = document.createElement('tr');
-    row.innerHTML = `
-            <td>${despesa.descricao}</td>
-            <td>€${despesa.valorMensal.toLocaleString()}</td>
-            <td>${despesa.anoInicio}</td>
-            <td>${despesa.anoFim}</td>
-            <td>
-                <button class="btn-action btn-edit" data-action="editar" data-id="${despesa.id}">${translate('edit')}</button>
-                <button class="btn-action btn-remove" data-action="remover" data-id="${despesa.id}">${translate('remove')}</button>
-            </td>
-        `;
-    tbody.appendChild(row);
-  });
-}
-
-// Funções de UI Gerais
 function popularDadosIniciais() {
   const dadosBasicos = dadosApp.dadosBasicos;
   document.getElementById('taxaRetirada').value = dadosBasicos.taxaRetirada;
@@ -281,24 +208,28 @@ function popularDadosIniciais() {
   document.getElementById('rendimentoAnual').value = dadosBasicos.rendimentoAnual;
   document.getElementById('despesasAnuais').value = dadosBasicos.despesasAnuais;
   document.getElementById('valorInvestido').value = dadosBasicos.valorInvestido;
-    
-  atualizarTabelaDepositos();
-  atualizarTabelaEventosUnicos();
-  atualizarTabelaEventosRecorrentes();
-  atualizarTabelaDespesasVariaveis();
+
+  refreshAllTables();
+}
+
+function refreshAllTables() {
+  depositoManager.atualizarTabela();
+  eventoUnicoManager.atualizarTabela();
+  eventoRecorrenteManager.atualizarTabela();
+  despesaManager.atualizarTabela();
 }
 
 function mostrarMensagem(texto, tipo) {
   const mensagensExistentes = document.querySelectorAll('.status-message');
   mensagensExistentes.forEach(msg => msg.remove());
-    
+
   const mensagem = document.createElement('div');
   mensagem.className = `status-message status-message--${tipo}`;
   mensagem.textContent = texto;
-    
+
   const main = document.querySelector('main');
   main.insertBefore(mensagem, main.firstChild);
-    
+
   setTimeout(() => {
     if (mensagem.parentNode) {
       mensagem.remove();
@@ -333,7 +264,6 @@ function criarTooltip(texto) {
 }
 
 function adicionarTooltips() {
-  // Remove tooltips existentes para evitar duplicados ao trocar de idioma
   document.querySelectorAll('.tooltip-container').forEach(tooltip => tooltip.remove());
 
   const sections = {
@@ -343,6 +273,7 @@ function adicionarTooltips() {
     'recurringFinancialEvents': 'recurringFinancialEventsInfo',
     'variableExpenses': 'variableExpensesInfo',
     'results': 'resultsInfo',
+    'sensitivityAnalysis': 'sensitivityAnalysisTooltip',
     'monteCarloSimulationResults': 'monteCarloSimulationInfo',
     'assetEvolution': 'assetEvolutionInfo',
     'expenseEvolution': 'expenseEvolutionInfo',
@@ -364,27 +295,12 @@ export {
   popularDadosIniciais,
   showLoader,
   hideLoader,
-  mostrarFormDeposito,
-  esconderFormDeposito,
-  preencherFormularioDeposito,
-  getDadosFormularioDeposito,
-  atualizarTabelaDepositos,
-  mostrarFormEventoUnico,
-  esconderFormEventoUnico,
-  preencherFormularioEventoUnico,
-  getDadosFormularioEventoUnico,
-  atualizarTabelaEventosUnicos,
-  mostrarFormEventoRecorrente,
-  esconderFormEventoRecorrente,
-  preencherFormularioEventoRecorrente,
-  getDadosFormularioEventoRecorrente,
-  atualizarTabelaEventosRecorrentes,
-  mostrarFormDespesa,
-  esconderFormDespesa,
-  preencherFormularioDespesa,
-  getDadosFormularioDespesa,
-  atualizarTabelaDespesasVariaveis,
   mostrarMensagem,
   criarTooltip,
-  adicionarTooltips
+  adicionarTooltips,
+  refreshAllTables,
+  depositoManager,
+  eventoUnicoManager,
+  eventoRecorrenteManager,
+  despesaManager,
 };
