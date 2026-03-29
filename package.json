@@ -3,19 +3,7 @@
   "version": "1.0.0",
   "description": "A simple calculator",
   "main": "src/app.js",
-  "scripts": {
-    "lint": "eslint .",
-    "prepare": "husky install"
-  },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "eslint": "^8.0.0",
-    "husky": "^8.0.0",
-    "lint-staged": "^13.0.0"
-  },
-  "lint-staged": {
-    "*.js": "eslint --cache --fix"
-  }
+  "license": "ISC"
 }

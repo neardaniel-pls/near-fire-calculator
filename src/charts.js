@@ -1,9 +1,31 @@
 import { dadosApp } from './state.js';
 
 let chartEvolucaoPatrimonial = null;
-let chartDespesasVariaveis   = null;
-let chartAssetAllocation     = null;
+let chartDespesasVariaveis = null;
+let chartAssetAllocation = null;
 let chartMonteCarloDistribution = null;
+
+function getYearRange() {
+  const anoBase = new Date().getFullYear();
+  const deposits = dadosApp.depositosDiversificados;
+  const despesas = dadosApp.despesasVariaveis;
+  let minYear = anoBase;
+  let maxYear = anoBase + (dadosApp.dadosBasicos.idadeReforma - dadosApp.dadosBasicos.idadeAtual);
+
+  deposits.forEach(dep => {
+    const start = new Date(dep.dataInicio).getFullYear();
+    const end = new Date(dep.dataFim).getFullYear();
+    if (start < minYear) minYear = start;
+    if (end > maxYear) maxYear = end;
+  });
+
+  despesas.forEach(d => {
+    if (d.anoInicio < minYear) minYear = d.anoInicio;
+    if (d.anoFim > maxYear) maxYear = d.anoFim;
+  });
+
+  return { minYear, maxYear };
+}
 
 function criarGraficoAssetAllocation() {
   const ctx = document.getElementById('chartAssetAllocation').getContext('2d');
@@ -14,7 +36,7 @@ function criarGraficoAssetAllocation() {
 
   const { depositosDiversificados } = dadosApp;
   const totalInvestido = depositosDiversificados.reduce((sum, dep) => sum + dep.valorMensal, 0);
-    
+
   const labels = depositosDiversificados.map(dep => dep.tipo);
   const data = depositosDiversificados.map(dep => (dep.valorMensal / totalInvestido) * 100);
 
@@ -71,7 +93,7 @@ function criarGraficoEvolucaoPatrimonial(dadosGrafico, granularidade) {
   const labels = granularidade === 'anual'
     ? dadosGrafico.map(d => d.ano)
     : dadosGrafico.map(d => `${d.mes + 1}/${d.ano}`);
-        
+
   const valoresNominais = dadosGrafico.map(d => d.valorNominal);
   const valoresReais = dadosGrafico.map(d => d.valorReal);
 
@@ -129,32 +151,28 @@ function criarGraficoEvolucaoPatrimonial(dadosGrafico, granularidade) {
 function criarGraficoDespesas() {
   const ctx = document.getElementById('chartDespesasVariaveis').getContext('2d');
 
-  // Destrói o gráfico anterior (se existir)
   if (chartDespesasVariaveis) {
     chartDespesasVariaveis.destroy();
   }
 
-  // ----- 1. Preparar anos do eixo‑X -----
+  const { minYear, maxYear } = getYearRange();
   const anos = [];
-  for (let ano = 2025; ano <= 2055; ano++) {
+  for (let ano = minYear; ano <= maxYear; ano++) {
     anos.push(ano);
   }
 
-  // ----- 2. Criar datasets individuais + acumular total -----
   const datasets = [];
   const cores = ['#1FB8CD', '#FFC185', '#B4413C', '#ECEBD5', '#5D878F', '#DB4545', '#D2BA4C', '#964325', '#944454', '#13343B'];
-  const totalPorAno = Array(anos.length).fill(0);   // vector para a linha "Total"
+  const totalPorAno = Array(anos.length).fill(0);
 
-  // -------- NOVO: Despesas Fixas Anuais --------
-  const despesasFixasAnuais = dadosApp.dadosBasicos.despesasAnuais || 0; // valor fixo todos os anos
-  // ---------------------------------------------
+  const despesasFixasAnuais = dadosApp.dadosBasicos.despesasAnuais || 0;
 
   dadosApp.despesasVariaveis.forEach((despesa, idx) => {
     const dadosDespesa = anos.map((ano, i) => {
       const valor = (ano >= despesa.anoInicio && ano <= despesa.anoFim)
-        ? despesa.valorMensal * 12   // converter mensal → anual
+        ? despesa.valorMensal * 12
         : 0;
-      totalPorAno[i] += valor;          // acumular no total
+      totalPorAno[i] += valor;
       return valor;
     });
 
@@ -162,19 +180,17 @@ function criarGraficoDespesas() {
       label: despesa.descricao,
       data: dadosDespesa,
       borderColor: cores[idx % cores.length],
-      backgroundColor: cores[idx % cores.length] + '33', // 20% opacidade
+      backgroundColor: cores[idx % cores.length] + '33',
       borderWidth: 2,
       fill: false,
       tension: 0.1
     });
   });
 
-  // ----- 3. Adicionar despesas fixas ao total e dataset opcional -----
   for (let i = 0; i < totalPorAno.length; i++) {
     totalPorAno[i] += despesasFixasAnuais;
   }
 
-  // Linha horizontal das despesas fixas (útil para referência visual)
   datasets.push({
     label: 'Despesas Fixas',
     data: anos.map(() => despesasFixasAnuais),
@@ -186,7 +202,6 @@ function criarGraficoDespesas() {
     borderDash: [4, 4]
   });
 
-  // Dataset "Total" (variáveis + fixas)
   datasets.push({
     label: 'Total (Variáveis + Fixas)',
     data: totalPorAno,
@@ -195,10 +210,9 @@ function criarGraficoDespesas() {
     borderWidth: 3,
     fill: false,
     tension: 0.1,
-    borderDash: [6, 4]   // linha tracejada para diferenciar
+    borderDash: [6, 4]
   });
 
-  // ----- 4. Construir gráfico -----
   chartDespesasVariaveis = new Chart(ctx, {
     type: 'line',
     data: {
@@ -251,52 +265,34 @@ function atualizarGraficos(resultadosSimulacao) {
   const granularidade = document.getElementById('chart-granularity').value;
   const periodButton = document.querySelector('.btn-group[role="toolbar"] .btn.active');
   const period = periodButton ? periodButton.dataset.period : 'ALL';
-    
-  let dadosFiltrados;
+
   const historico = granularidade === 'anual'
     ? resultadosSimulacao.historicoPatrimonialAnual
     : resultadosSimulacao.historicoPatrimonialMensal;
 
-  const hoje = new Date();
-  const anoAtual = hoje.getFullYear();
+  let maxItens = historico.length;
 
-  let dataLimiteInferior = null;
-
-  if (period !== 'ALL') { // Only apply filter if period is not 'ALL'
+  if (period !== 'ALL') {
     if (granularidade === 'mensal') {
       switch (period) {
-      case '1M': dataLimiteInferior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, hoje.getDate()); break;
-      case '6M': dataLimiteInferior = new Date(hoje.getFullYear(), hoje.getMonth() - 6, hoje.getDate()); break;
-      case 'YTD': dataLimiteInferior = new Date(hoje.getFullYear(), 0, 1); break;
-      case '1A': dataLimiteInferior = new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate()); break;
+      case '1M': maxItens = 2; break;
+      case '6M': maxItens = 7; break;
+      case 'YTD': maxItens = 12 - new Date().getMonth(); break;
+      case '1A': maxItens = 13; break;
       }
-    } else if (granularidade === 'anual') {
+    } else {
       switch (period) {
-      case 'YTD': dataLimiteInferior = new Date(anoAtual, 0, 1); break;
-      case '1A': dataLimiteInferior = new Date(anoAtual - 1, 0, 1); break;
-        // For '1M' and '6M' with annual granularity, they don't have a direct annual equivalent.
-        // We can choose to show all annual data or the last few years.
-        // For now, setting dataLimiteInferior to null will make it show all annual data.
+      case 'YTD': maxItens = 1; break;
+      case '1A': maxItens = 2; break;
       case '1M':
       case '6M':
-        dataLimiteInferior = null; // Effectively treats these as 'ALL' for annual view
+        maxItens = 1;
         break;
       }
     }
   }
 
-  if (dataLimiteInferior) { // Apply filter if a limit date was determined
-    dadosFiltrados = historico.filter(d => {
-      // Para dados anuais, consideramos o início do ano. Para mensais, o mês específico.
-      const dataPonto = granularidade === 'anual'
-        ? new Date(d.ano, 0, 1)
-        : new Date(d.ano, d.mes, 1);
-      return dataPonto >= dataLimiteInferior;
-    });
-  } else {
-    dadosFiltrados = historico;
-  }
-
+  const dadosFiltrados = historico.slice(0, maxItens);
 
   criarGraficoEvolucaoPatrimonial(dadosFiltrados, granularidade);
   criarGraficoDespesas();
@@ -309,11 +305,10 @@ function criarGraficoMonteCarloDistribution(resultados) {
   if (chartMonteCarloDistribution) {
     chartMonteCarloDistribution.destroy();
   }
-    
-  // Para um histograma, é melhor agrupar os resultados em "bins"
+
   const min = Math.min(...resultados);
   const max = Math.max(...resultados);
-  const numBins = Math.min(50, Math.sqrt(resultados.length)); // Regra de Sturges, limitado a 50 bins
+  const numBins = Math.min(50, Math.sqrt(resultados.length));
   const binSize = (max - min) / numBins;
 
   const bins = Array(Math.ceil(numBins)).fill(0);
@@ -327,7 +322,7 @@ function criarGraficoMonteCarloDistribution(resultados) {
 
   resultados.forEach(res => {
     let binIndex = Math.floor((res - min) / binSize);
-    if (binIndex >= bins.length) binIndex = bins.length - 1; // Para o valor máximo
+    if (binIndex >= bins.length) binIndex = bins.length - 1;
     bins[binIndex]++;
   });
 
@@ -356,7 +351,7 @@ function criarGraficoMonteCarloDistribution(resultados) {
             maxRotation: 90,
             minRotation: 70,
             autoSkip: true,
-            maxTicksLimit: 10 // Limita o número de labels visíveis
+            maxTicksLimit: 10
           }
         },
         y: {

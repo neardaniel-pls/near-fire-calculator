@@ -17,7 +17,12 @@
         <div class="container">
             <h1 data-i18n-key="fireCalculator">Calculadora FIRE</h1>
             <p data-i18n-key="financialIndependence">Independência Financeira, Aposentadoria Antecipada</p>
-            <div class="language-switcher">
+            <div class="header-controls">
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle dark/light mode">
+                    <span class="theme-icon sun">☀️</span>
+                    <span class="theme-icon moon hidden">🌙</span>
+                </button>
+                <div class="language-switcher">
                 <button id="lang-selector" class="lang-selector">
                     <span id="current-lang-flag">🇵🇹</span> <span id="current-lang-text">PT</span>
                 </button>
@@ -25,6 +30,7 @@
                     <a href="#" class="lang-option" data-lang="pt">🇵🇹 Português</a>
                     <a href="#" class="lang-option" data-lang="en">🇬🇧 English</a>
                 </div>
+            </div>
             </div>
         </div>
     </header>
@@ -421,6 +427,24 @@
                         <div class="resultado-value" id="mcTaxaSucesso">0%</div>
                     </div>
                 </div>
+                <div class="resultados-grid" style="margin-top: 24px;">
+                    <div class="resultado-item">
+                        <div class="resultado-label" data-i18n-key="optimisticRetirementAge">Idade de Reforma (Otimista - P10)</div>
+                        <div class="resultado-value" id="mcIdadeOtimista">—</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="resultado-label" data-i18n-key="medianRetirementAge">Idade de Reforma (Mediana - P50)</div>
+                        <div class="resultado-value" id="mcIdadeMediana">—</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="resultado-label" data-i18n-key="pessimisticRetirementAge">Idade de Reforma (Pessimista - P90)</div>
+                        <div class="resultado-value" id="mcIdadePessimista">—</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="resultado-label" data-i18n-key="retirementAgeExplanation">Explicação</div>
+                        <div class="resultado-value" style="font-size: 0.8em; line-height: 1.2;">Otimista: 10% melhores casos<br>Mediana: resultado mais provável<br>Pessimista: 90% garantido</div>
+                    </div>
+                </div>
                 <div class="chart-container" style="height: 400px; width: 100%; margin-top: 24px;">
                     <canvas id="chartMonteCarloDistribution"></canvas>
                 </div>
@@ -430,22 +454,9 @@
         <section id="analiseSensibilidade" class="card section hidden">
             <div class="card__header">
                 <h2 data-i18n-key="sensitivityAnalysis">Análise de Sensibilidade</h2>
-   </div>
-   <div class="card__body">
-                <p data-i18n-key="sensitivityAnalysisDescription">Esta análise mostra como a sua Idade FIRE pode variar com pequenas alterações nos seus pressupostos de retorno e inflação.</p>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th data-i18n-key="scenario">Cenário</th>
-                                <th data-i18n-key="resultingFireAge">Idade FIRE Resultante</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelaAnaliseSensibilidade">
-                            <!-- Os resultados da análise serão inseridos aqui -->
-                        </tbody>
-                    </table>
-                </div>
+            </div>
+            <div class="card__body">
+                <div id="sensitivityHeatmap" class="sensitivity-heatmap"></div>
             </div>
         </section>
 <section id="sequenceOfReturnsRisk" class="card section hidden">
