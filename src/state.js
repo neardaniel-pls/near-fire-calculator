@@ -1,6 +1,3 @@
-// ------------------------------ STATE MANAGEMENT ------------------------------
-
-// Estado inicial da aplicação
 const initialState = {
   dadosBasicos: {
     taxaRetirada: 4,
@@ -48,7 +45,7 @@ const initialState = {
       {
         id: 1,
         ano: 2035,
-        mes: 6, // Junho
+        mes: 6,
         tipo: 'Depósito',
         valor: 5000,
         descricao: 'Herança'
@@ -56,7 +53,7 @@ const initialState = {
       {
         id: 2,
         ano: 2035,
-        mes: 7, // Julho
+        mes: 7,
         tipo: 'Levantamento',
         valor: 6000,
         descricao: 'Viagem Japão'
@@ -70,7 +67,7 @@ const initialState = {
         periodicidade: 'Anual',
         valorPeriodo: 50,
         descricao: 'Bônus',
-        tipo: 'Renda Extra'
+        tipo: 'Depósito'
       }
     ]
   },
@@ -99,10 +96,8 @@ const initialState = {
   ]
 };
 
-// O estado principal da aplicação
 let dadosApp = JSON.parse(JSON.stringify(initialState));
 
-// Variáveis de estado para edição
 let estadoEdicao = {
   deposito: null,
   despesa: null,
@@ -110,14 +105,11 @@ let estadoEdicao = {
   eventoRecorrente: null
 };
 
-// ------------------------------ PERSISTÊNCIA DE DADOS ------------------------------
-
 function salvarDadosNoLocalStorage() {
   try {
     localStorage.setItem('dadosCalculadoraFIRE', JSON.stringify(dadosApp));
   } catch (e) {
     console.error('Erro ao salvar dados no LocalStorage:', e);
-    // Futuramente, podemos usar um módulo de UI para mostrar esta mensagem
   }
 }
 
@@ -126,30 +118,25 @@ function carregarDadosDoLocalStorage() {
     const dadosSalvos = localStorage.getItem('dadosCalculadoraFIRE');
     if (dadosSalvos) {
       let dadosParse = JSON.parse(dadosSalvos);
-            
-      // Garantir a migração de dados para novas estruturas
+
       if (dadosParse.eventosFinanceiros && dadosParse.eventosFinanceiros.unicos) {
         dadosParse.eventosFinanceiros.unicos.forEach(e => {
-          if (!e.mes) e.mes = 1; // Adiciona o mês padrão se não existir
+          if (!e.mes) e.mes = 1;
         });
       }
       if (dadosParse.depositosDiversificados) {
         dadosParse.depositosDiversificados.forEach(d => {
-          if (!d.desvioPadrao) d.desvioPadrao = 5; // Adiciona desvio padrão padrão
+          if (!d.desvioPadrao) d.desvioPadrao = 5;
         });
       }
 
-      // Fundir dados para garantir que novas propriedades sejam adicionadas
-      // caso o modelo de dados mude no futuro.
       dadosApp = { ...initialState, ...dadosParse };
     }
   } catch (e) {
     console.error('Erro ao carregar dados do LocalStorage:', e);
-    // Futuramente, podemos usar um módulo de UI para mostrar esta mensagem
   }
 }
 
-// Exporta as funções e o estado para serem usados em outros módulos
 export {
   dadosApp,
   estadoEdicao,

@@ -7,25 +7,19 @@ const PERIODOS_POR_ANO = {
   Anual: 1
 };
 
-// ==========================================
-// FUNÇÕES AUXILIARES
-// ==========================================
-
 function calcularAlvoFIRE(anoAtual, inflacaoAcumulada) {
   const { dadosBasicos, despesasVariaveis } = dadosApp;
-  
-  // 1. Capital para Despesas Eternas
+
   const despesasFixasNominais = dadosBasicos.despesasAnuais * inflacaoAcumulada;
   const capitalPerpetuo = despesasFixasNominais / (dadosBasicos.taxaRetirada / 100);
 
-  // 2. Capital para Despesas Temporárias
   let capitalTemporario = 0;
-  
+
   (despesasVariaveis ?? []).forEach(despesa => {
     if (despesa.anoFim >= anoAtual) {
       const anoInicioCobrar = Math.max(anoAtual, despesa.anoInicio);
       const anosRestantes = despesa.anoFim - anoInicioCobrar + 1;
-      
+
       if (anosRestantes > 0) {
         const custoTotalRestante = despesa.valorMensal * 12 * anosRestantes;
         capitalTemporario += custoTotalRestante;
@@ -35,8 +29,6 @@ function calcularAlvoFIRE(anoAtual, inflacaoAcumulada) {
 
   return capitalPerpetuo + capitalTemporario;
 }
-
-// — Fluxos de Caixa —
 
 function fluxoUnicoMensal(ano, mes) {
   return (dadosApp.eventosFinanceiros?.unicos ?? []).reduce((total, evento) => {
@@ -84,21 +76,9 @@ function fluxoUnicoAnual(ano) {
   }, 0);
 }
 
-function fluxoVariavelAnual(ano) {
-  return (dadosApp.despesasVariaveis ?? []).reduce((total, despesa) => {
-    if (ano >= despesa.anoInicio && ano <= despesa.anoFim) {
-      return total - (despesa.valorMensal * 12); 
-    }
-    return total;
-  }, 0);
-}
-
-// ==========================================
-// SIMULAÇÃO DETERMINÍSTICA
-// ==========================================
-
-function simularEvolucaoPatrimonial() {
-  const { dadosBasicos, depositosDiversificados } = dadosApp;
+function simularEvolucaoPatrimonial(dadosOverride = null) {
+  const dados = dadosOverride || dadosApp;
+  const { dadosBasicos, depositosDiversificados } = dados;
   const anoBase = new Date().getFullYear();
   const anosDeSimulacao = dadosBasicos.idadeReforma - dadosBasicos.idadeAtual;
   const ANO_MAXIMO_SIMULACAO = Math.max(anosDeSimulacao, 1);
@@ -142,7 +122,7 @@ function simularEvolucaoPatrimonial() {
     const mesCorrente = (i - 1) % 12;
 
     const jurosMensais = valorAtual * taxaRetornoNominalMensal;
-    
+
     let contribuicaoMensalAtual = 0;
     const dataMesAtual = new Date(anoCorrente, mesCorrente, 1);
     depositosDiversificados.forEach(dep => {
@@ -155,7 +135,7 @@ function simularEvolucaoPatrimonial() {
     valorAtual += jurosMensais + fluxoCaixaMensal;
 
     const inflacaoAcumulada = Math.pow(1 + taxaInflacaoMensal, i);
-    
+
     historicoPatrimonialMensal.push({
       ano: anoCorrente,
       mes: mesCorrente,
@@ -184,8 +164,8 @@ function simularEvolucaoPatrimonial() {
   if (!atingiuFIRE) anosParaFIRE = 'N/A';
 
   const inflacaoFinal = Math.pow(1 + taxaInflacaoMensal, ANO_MAXIMO_SIMULACAO * 12);
-  const valorFIREFinalSimulacao = atingiuFIRE 
-    ? valorFIRENoMomentoFIRE 
+  const valorFIREFinalSimulacao = atingiuFIRE
+    ? valorFIRENoMomentoFIRE
     : calcularAlvoFIRE(anoBase + ANO_MAXIMO_SIMULACAO, inflacaoFinal);
 
   return {
@@ -199,9 +179,44 @@ function simularEvolucaoPatrimonial() {
   };
 }
 
-// ==========================================
-// SIMULAÇÃO DE MONTE CARLO
-// ==========================================
+function calcularAnaliseSensibilidade() {
+  const inflacaoDelta = [-1, 0, 1, 2];
+  const retornoDelta = [-2, -1, 0, 1, 2];
+  const resultados = [];
+
+  inflacaoDelta.forEach(deltaInflacao => {
+    retornoDelta.forEach(deltaRetorno => {
+      const inflacaoNova = dadosApp.dadosBasicos.inflacaoAnual + deltaInflacao;
+      if (inflacaoNova < 0) return;
+
+      const dadosBasicosOverride = {
+        ...dadosApp.dadosBasicos,
+        inflacaoAnual: inflacaoNova,
+      };
+
+      const depositosOverride = dadosApp.depositosDiversificados.map(dep => ({
+        ...dep,
+        taxaEsperada: dep.taxaEsperada + deltaRetorno,
+      }));
+
+      const dadosOverride = {
+        ...dadosApp,
+        dadosBasicos: dadosBasicosOverride,
+        depositosDiversificados: depositosOverride,
+      };
+
+      const resultado = simularEvolucaoPatrimonial(dadosOverride);
+
+      resultados.push({
+        deltaInflacao: deltaInflacao,
+        deltaRetorno: deltaRetorno,
+        idadeFIRE: resultado.idadeFIRE,
+      });
+    });
+  });
+
+  return resultados;
+}
 
 function gerarNumeroNormal(media, desvioPadrao) {
   let u = 0, v = 0;
@@ -214,7 +229,7 @@ function gerarNumeroNormal(media, desvioPadrao) {
 function executarSimulacaoMonteCarloAvancada(dados) {
   const { dadosBasicos, depositosDiversificados } = dados;
   const anoBase = new Date().getFullYear();
-  
+
   const IDADE_MAXIMA_SIMULACAO = 85;
   const anosAteMaximo = IDADE_MAXIMA_SIMULACAO - dadosBasicos.idadeAtual;
   const idadeReformaPlaneada = dadosBasicos.idadeReforma;
@@ -223,16 +238,13 @@ function executarSimulacaoMonteCarloAvancada(dados) {
   let valorAtual = dadosBasicos.valorInvestido;
   let idadeAtingiuFIRE = null;
   let valorNaReformaPlaneada = 0;
-
-  // CORREÇÃO: Variável declarada FORA do loop para manter o valor entre meses
-  let taxaRetornoNominalMensal = 0; 
+  let taxaRetornoNominalMensal = 0;
 
   for (let i = 1; i <= anosAteMaximo * 12; i++) {
     const anoCorrente = anoBase + Math.floor((i - 1) / 12);
     const mesCorrente = (i - 1) % 12;
     const idadeAtualSimulada = dadosBasicos.idadeAtual + Math.floor((i - 1) / 12);
 
-    // 1. Determinar Taxa de Retorno (Volatilidade Anual - Atualizada em Janeiro)
     if (mesCorrente === 0 || i === 1) {
       let somaPonderada = 0;
       let totalPesos = 0;
@@ -246,31 +258,28 @@ function executarSimulacaoMonteCarloAvancada(dados) {
       taxaRetornoNominalMensal = Math.pow(1 + taxaAnual, 1 / 12) - 1;
     }
 
-    // 2. Juros (Agora aplica-se corretamente todos os meses)
     const juros = valorAtual * taxaRetornoNominalMensal;
-    
+
     let aportes = 0;
     const dataMes = new Date(anoCorrente, mesCorrente, 1);
     depositosDiversificados.forEach(dep => {
-        if (dataMes >= new Date(dep.dataInicio) && dataMes <= new Date(dep.dataFim)) aportes += dep.valorMensal;
+      if (dataMes >= new Date(dep.dataInicio) && dataMes <= new Date(dep.dataFim)) aportes += dep.valorMensal;
     });
 
     const fluxosExtras = fluxoRecorrenteMensal(anoCorrente, mesCorrente) + fluxoUnicoMensal(anoCorrente, mesCorrente);
     valorAtual += juros + aportes + fluxosExtras;
 
-    // 3. Guardar valor na data de reforma planeada
     if (anoCorrente === anoReformaPlaneada && mesCorrente === 11) {
-        valorNaReformaPlaneada = valorAtual;
+      valorNaReformaPlaneada = valorAtual;
     }
 
-    // 4. Verificar se atingiu FIRE
     if (idadeAtingiuFIRE === null && mesCorrente === 11) {
-        const inflacaoAcumulada = Math.pow(1 + dadosBasicos.inflacaoAnual / 100, (i / 12));
-        const alvoFIRE = calcularAlvoFIRE(anoCorrente, inflacaoAcumulada);
-        
-        if (valorAtual >= alvoFIRE) {
-            idadeAtingiuFIRE = idadeAtualSimulada; 
-        }
+      const inflacaoAcumulada = Math.pow(1 + dadosBasicos.inflacaoAnual / 100, (i / 12));
+      const alvoFIRE = calcularAlvoFIRE(anoCorrente, inflacaoAcumulada);
+
+      if (valorAtual >= alvoFIRE) {
+        idadeAtingiuFIRE = idadeAtualSimulada;
+      }
     }
   }
 
@@ -288,7 +297,7 @@ function simularMonteCarlo(numSimulacoes = 2500) {
     const res = executarSimulacaoMonteCarloAvancada(dadosApp);
     resultadosValores.push(res.valorNaReformaPlaneada);
     if (res.idadeAtingiuFIRE !== null) {
-        resultadosIdades.push(res.idadeAtingiuFIRE);
+      resultadosIdades.push(res.idadeAtingiuFIRE);
     }
   }
 
@@ -305,20 +314,20 @@ function simularMonteCarlo(numSimulacoes = 2500) {
   const sucessoSimulacoes = resultadosValores.filter(r => r >= alvoFixo).length;
   const taxaDeSucesso = (sucessoSimulacoes / numSimulacoes) * 100;
 
-  let idadePessimista = "Nunca (>85)"; 
-  let idadeMediana = "Nunca (>85)";    
-  let idadeOtimista = "Nunca (>85)";  
+  let idadePessimista = "Nunca (>85)";
+  let idadeMediana = "Nunca (>85)";
+  let idadeOtimista = "Nunca (>85)";
 
   if (resultadosIdades.length > 0) {
-      if (resultadosIdades.length >= numSimulacoes * 0.1) {
-          idadeOtimista = resultadosIdades[Math.floor(resultadosIdades.length * 0.10)];
-      }
-      if (resultadosIdades.length >= numSimulacoes * 0.5) {
-          idadeMediana = resultadosIdades[Math.floor(resultadosIdades.length * 0.50)];
-      }
-      if (resultadosIdades.length >= numSimulacoes * 0.9) {
-          idadePessimista = resultadosIdades[Math.floor(resultadosIdades.length * 0.90)];
-      }
+    if (resultadosIdades.length >= numSimulacoes * 0.1) {
+      idadeOtimista = resultadosIdades[Math.floor(resultadosIdades.length * 0.10)];
+    }
+    if (resultadosIdades.length >= numSimulacoes * 0.5) {
+      idadeMediana = resultadosIdades[Math.floor(resultadosIdades.length * 0.50)];
+    }
+    if (resultadosIdades.length >= numSimulacoes * 0.9) {
+      idadePessimista = resultadosIdades[Math.floor(resultadosIdades.length * 0.90)];
+    }
   }
 
   return {
@@ -326,9 +335,9 @@ function simularMonteCarlo(numSimulacoes = 2500) {
     taxaDeSucesso,
     resultados: resultadosValores,
     idadesFIRE: {
-        otimista: idadeOtimista, 
-        mediana: idadeMediana,   
-        pessimista: idadePessimista 
+      otimista: idadeOtimista,
+      mediana: idadeMediana,
+      pessimista: idadePessimista
     }
   };
 }
@@ -345,7 +354,7 @@ function simularSequenceOfReturnsRisk(srrDuration, srrReturn) {
     totalContribuicaoMensal += dep.valorMensal;
     somaPonderada += dep.valorMensal * (dep.taxaEsperada / 100);
   });
-  
+
   const taxaRetornoNominalAnual = totalContribuicaoMensal > 0 ? somaPonderada / totalContribuicaoMensal : 0.07;
   const taxaRetornoStressAnual = srrReturn / 100;
 
@@ -362,11 +371,11 @@ function simularSequenceOfReturnsRisk(srrDuration, srrReturn) {
 
     let contribuicaoAnual = 0;
     depositosDiversificados.forEach(dep => {
-       const anoInicio = new Date(dep.dataInicio).getFullYear();
-       const anoFim = new Date(dep.dataFim).getFullYear();
-       if (anoCorrente >= anoInicio && anoCorrente <= anoFim) {
-         contribuicaoAnual += dep.valorMensal * 12;
-       }
+      const anoInicio = new Date(dep.dataInicio).getFullYear();
+      const anoFim = new Date(dep.dataFim).getFullYear();
+      if (anoCorrente >= anoInicio && anoCorrente <= anoFim) {
+        contribuicaoAnual += dep.valorMensal * 12;
+      }
     });
 
     const fluxoEventosRecorrentes = fluxoRecorrenteAnual(anoCorrente);
@@ -384,4 +393,4 @@ function simularSequenceOfReturnsRisk(srrDuration, srrReturn) {
   return { historicoPatrimonialAnual };
 }
 
-export { simularEvolucaoPatrimonial, simularMonteCarlo, simularSequenceOfReturnsRisk };
+export { simularEvolucaoPatrimonial, simularMonteCarlo, simularSequenceOfReturnsRisk, calcularAnaliseSensibilidade };
