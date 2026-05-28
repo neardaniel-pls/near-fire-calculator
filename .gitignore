@@ -21,6 +21,7 @@ yarn-error.log*
 # IDEs and editors
 .vscode/
 .idea/
+.kilo/
 *.suo
 *.ntvs*
 *.njsproj

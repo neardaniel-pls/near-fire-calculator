@@ -1,9 +1,17 @@
 {
   "name": "calculadora-fire",
   "version": "1.0.0",
-  "description": "A simple calculator",
+  "description": "FIRE calculator for the Portuguese community with Monte Carlo simulation",
   "main": "src/app.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neardaniel-pls/calculadora-fire.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neardaniel-pls/calculadora-fire/issues"
+  },
+  "homepage": "https://github.com/neardaniel-pls/calculadora-fire",
+  "keywords": ["fire", "calculator", "portfolio", "monte-carlo", "portugal"],
+  "author": "Daniel (neardaniel-pls)",
+  "license": "MIT"
 }
